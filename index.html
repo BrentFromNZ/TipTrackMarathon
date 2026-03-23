@@ -350,6 +350,40 @@
 
     /* ── DNF button row ──────────────────────────── */
     .flex-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    /* ── Edit modal ──────────────────────────────── */
+    #edit-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.3);
+      z-index: 199;
+      min-width: 280px;
+      max-width: 480px;
+      width: 94vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #edit-modal.show { display: block; }
+    #edit-modal h2 { font-size:.95rem; color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:12px; }
+    .lap-edit-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .84rem;
+    }
+    .lap-edit-row:last-child { border-bottom: none; }
+    .lap-edit-num   { font-weight: 700; min-width: 48px; }
+    .lap-edit-time  { font-family: monospace; font-weight: 700; min-width: 72px; }
+    .lap-edit-split { color: var(--mid); font-size: .78rem; flex: 1; }
+    .lap-edit-btns  { display: flex; gap: 4px; }
   </style>
 </head>
 <body>
@@ -568,8 +602,56 @@
 
 </main>
 
+<!-- Edit Athlete Modal -->
+<div id="edit-modal">
+  <h2>✏️ Edit Athlete</h2>
+  <input type="hidden" id="edit-orig-bib">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div class="form-group">
+      <label>Bib Number</label>
+      <input type="number" id="edit-bib" min="1">
+    </div>
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="edit-name">
+    </div>
+    <div class="form-group">
+      <label>Distance</label>
+      <select id="edit-dist">
+        <option value="21km">21 km (3 laps)</option>
+        <option value="42km">42 km (6 laps)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Gender</label>
+      <select id="edit-gender">
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+      </select>
+    </div>
+    <div class="form-group" style="grid-column:span 2;">
+      <label>Age Group</label>
+      <select id="edit-age">
+        <option value="18-30">18 – 30</option>
+        <option value="30-40">30 – 40</option>
+        <option value="40-50">40 – 50</option>
+        <option value="50-60">50 – 60</option>
+        <option value="60+">60 +</option>
+      </select>
+    </div>
+  </div>
+  <div id="edit-laps-section">
+    <div style="font-size:.85rem;font-weight:700;color:var(--primary);border-top:1px solid var(--border);padding-top:10px;margin-top:4px;margin-bottom:8px;">Recorded Lap Times</div>
+    <div id="edit-laps-list"></div>
+  </div>
+  <div class="cf-btns" style="margin-top:14px;">
+    <button class="btn btn-primary" onclick="saveEditAthlete()">💾 Save Changes</button>
+    <button class="btn btn-outline" onclick="closeEditModal()">✕ Cancel</button>
+  </div>
+</div>
+
 <!-- Confirm overlay -->
-<div id="overlay" onclick="cancelConfirm()"></div>
+<div id="overlay" onclick="overlayClick()"></div>
 <div id="confirm-box">
   <div id="cf-finish-lbl" class="cf-finish" style="display:none;">🏁 FINISH!</div>
   <div class="cf-bib"  id="cf-bib"></div>
@@ -737,6 +819,7 @@ function renderAthletes() {
       <td>${done}/${total}</td>
       <td>${statusBadge(a.status)}</td>
       <td style="white-space:nowrap;">
+        <button class="btn btn-outline btn-sm" onclick="openEditAthlete('${esc(a.bib)}')">✏️</button>
         ${canDel ? `<button class="btn btn-danger btn-sm" onclick="removeAthlete('${esc(a.bib)}')">✕</button>` : ''}
         ${canDNF ? `<button class="btn btn-warning btn-sm" onclick="markDNF('${esc(a.bib)}')">DNF</button>` : ''}
       </td>
@@ -878,7 +961,162 @@ function cancelConfirm() {
   pending = null;
   bibClear();
   document.getElementById('confirm-box').classList.remove('show');
-  document.getElementById('overlay').classList.remove('show');
+  if (!document.getElementById('edit-modal').classList.contains('show')) {
+    document.getElementById('overlay').classList.remove('show');
+  }
+}
+
+function overlayClick() {
+  if (document.getElementById('confirm-box').classList.contains('show')) cancelConfirm();
+  else if (document.getElementById('edit-modal').classList.contains('show')) closeEditModal();
+}
+
+/* ============================================================
+   EDIT ATHLETE MODAL
+   ============================================================ */
+function openEditAthlete(bib) {
+  const a = db.athletes.find(x => x.bib === bib);
+  if (!a) return;
+  document.getElementById('edit-orig-bib').value = bib;
+  document.getElementById('edit-bib').value      = a.bib;
+  document.getElementById('edit-name').value     = a.name;
+  document.getElementById('edit-dist').value     = a.dist;
+  document.getElementById('edit-gender').value   = a.gender;
+  document.getElementById('edit-age').value      = a.age;
+  renderEditLaps(a);
+  document.getElementById('edit-modal').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function renderEditLaps(a) {
+  const container = document.getElementById('edit-laps-list');
+  if (!a.laps.length) {
+    container.innerHTML = '<div style="color:var(--mid);font-size:.82rem;padding:6px 0;">No laps recorded yet.</div>';
+    return;
+  }
+  container.innerHTML = a.laps.map((l, i) => {
+    const split = i === 0 ? l.elapsed : l.elapsed - a.laps[i-1].elapsed;
+    return `<div class="lap-edit-row">
+      <span class="lap-edit-num">Lap ${i+1}</span>
+      <span class="lap-edit-time">${fmtMs(l.elapsed)}</span>
+      <span class="lap-edit-split">(split: ${fmtMs(split)})</span>
+      <div class="lap-edit-btns">
+        <button class="btn btn-outline btn-sm" onclick="editLapTime('${esc(a.bib)}',${i})">✏️</button>
+        <button class="btn btn-danger  btn-sm" onclick="deleteLap('${esc(a.bib)}',${i})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveEditAthlete() {
+  const origBib = document.getElementById('edit-orig-bib').value;
+  const newBib  = String(document.getElementById('edit-bib').value).trim();
+  const name    = document.getElementById('edit-name').value.trim();
+  const dist    = document.getElementById('edit-dist').value;
+  const gender  = document.getElementById('edit-gender').value;
+  const age     = document.getElementById('edit-age').value;
+
+  if (!newBib || !name) { toast('Bib and name are required.', 'error'); return; }
+  if (newBib !== origBib && db.athletes.find(a => a.bib === newBib)) {
+    toast('Bib #' + newBib + ' is already in use.', 'error'); return;
+  }
+
+  const a = db.athletes.find(x => x.bib === origBib);
+  if (!a) return;
+
+  a.bib    = newBib;
+  a.name   = name;
+  a.dist   = dist;
+  a.gender = gender;
+  a.age    = age;
+
+  // Recalculate status if distance changed
+  const totalLaps = LAPS[dist];
+  if (a.laps.length >= totalLaps) {
+    a.laps          = a.laps.slice(0, totalLaps);
+    a.finishElapsed = a.laps[totalLaps - 1].elapsed;
+    a.status        = 'finished';
+  } else if (a.status === 'finished') {
+    a.status        = 'racing';
+    a.finishElapsed = null;
+  }
+
+  // Update bib in activity log
+  db.activity.forEach(act => { if (act.bib === origBib) act.bib = newBib; });
+
+  save();
+  closeEditModal();
+  renderAthletes();
+  renderDashboard();
+  toast('Athlete updated.', 'success');
+}
+
+function deleteLap(bib, lapIdx) {
+  const a = db.athletes.find(x => x.bib === bib);
+  if (!a) return;
+  if (!confirm('Delete Lap ' + (lapIdx + 1) + ' for ' + a.name + '?')) return;
+
+  a.laps.splice(lapIdx, 1);
+
+  // Recalculate finish status
+  const total = LAPS[a.dist];
+  if (a.laps.length >= total) {
+    a.finishElapsed = a.laps[total - 1].elapsed;
+    a.status        = 'finished';
+  } else if (a.status === 'finished') {
+    a.finishElapsed = null;
+    a.status        = 'racing';
+  }
+
+  // Remove from activity log
+  db.activity = db.activity.filter(act => !(act.bib === bib && act.lapNum === lapIdx + 1));
+
+  save();
+  renderEditLaps(a);
+  renderDashboard();
+  toast('Lap ' + (lapIdx + 1) + ' deleted.', 'warning');
+}
+
+function editLapTime(bib, lapIdx) {
+  const a = db.athletes.find(x => x.bib === bib);
+  if (!a || !a.laps[lapIdx]) return;
+
+  const current = fmtMs(a.laps[lapIdx].elapsed);
+  const input   = prompt('New elapsed time for Lap ' + (lapIdx + 1) + ' (HH:MM:SS):', current);
+  if (input === null) return;
+
+  const ms = parseFmtMs(input.trim());
+  if (ms === null || ms <= 0) { toast('Invalid time. Use HH:MM:SS format.', 'error'); return; }
+
+  a.laps[lapIdx].elapsed = ms;
+
+  // Keep finishElapsed in sync
+  const total = LAPS[a.dist];
+  if (a.status === 'finished' && lapIdx === total - 1) a.finishElapsed = ms;
+
+  // Update matching activity log entry
+  for (const act of db.activity) {
+    if (act.bib === bib && act.lapNum === lapIdx + 1) { act.elapsed = ms; break; }
+  }
+
+  save();
+  renderEditLaps(a);
+  toast('Lap ' + (lapIdx + 1) + ' time updated.', 'success');
+}
+
+function parseFmtMs(str) {
+  const parts = str.split(':').map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 3) return ((parts[0] * 3600) + (parts[1] * 60) + parts[2]) * 1000;
+  if (parts.length === 2) return ((parts[0] * 60) + parts[1]) * 1000;
+  return null;
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('show');
+  if (!document.getElementById('confirm-box').classList.contains('show')) {
+    document.getElementById('overlay').classList.remove('show');
+  }
 }
 
 function renderTimingView() {
