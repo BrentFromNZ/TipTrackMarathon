@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tip Track Marathon Timer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:       #1a73e8;
+      --primary-dark:  #1557b0;
+      --success:       #1e8449;
+      --warning:       #e65100;
+      --danger:        #c0392b;
+      --dark:          #202124;
+      --mid:           #5f6368;
+      --light:         #f1f3f4;
+      --white:         #ffffff;
+      --border:        #dadce0;
+      --shadow:        0 1px 4px rgba(0,0,0,.18);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: var(--light);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────────── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 16px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; flex: 1; }
+    #race-clock {
+      font-family: monospace;
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: rgba(255,255,255,.18);
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: none;
+    }
+
+    /* ── Nav ─────────────────────────────────────── */
+    nav {
+      background: #fff;
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 56px;
+      z-index: 99;
+      overflow-x: auto;
+    }
+    nav button {
+      flex: 1;
+      min-width: 72px;
+      padding: 12px 6px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: .78rem;
+      color: var(--mid);
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      transition: all .2s;
+    }
+    nav button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+    nav button:hover:not(.active) { background: var(--light); }
+
+    /* ── Layout ──────────────────────────────────── */
+    main { padding: 16px; max-width: 820px; margin: 0 auto; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Cards ───────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--primary);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Forms ───────────────────────────────────── */
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: .82rem; color: var(--mid); font-weight: 600; margin-bottom: 4px; }
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: .9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+
+    /* ── Buttons ─────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 600;
+      transition: filter .15s, opacity .15s;
+    }
+    .btn:hover { filter: brightness(.9); }
+    .btn:active { filter: brightness(.8); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+    .btn-primary  { background: var(--primary);  color: #fff; }
+    .btn-success  { background: var(--success);  color: #fff; }
+    .btn-danger   { background: var(--danger);   color: #fff; }
+    .btn-warning  { background: var(--warning);  color: #fff; }
+    .btn-outline  { background: #fff; border: 1px solid var(--border); color: var(--dark); }
+    .btn-lg       { padding: 13px 24px; font-size: 1rem; width: 100%; }
+    .btn-sm       { padding: 5px 11px; font-size: .78rem; }
+    .btn-full     { width: 100%; }
+
+    /* ── Dashboard stats ─────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 480px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+    .stat-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-box .stat-val  { font-size: 2rem; font-weight: 800; color: var(--primary); }
+    .stat-box .stat-val.orange { color: #e67e22; }
+    .stat-box .stat-val.green  { color: var(--success); }
+    .stat-box .stat-lbl  { font-size: .75rem; color: var(--mid); margin-top: 3px; }
+
+    /* ── Recent activity list ────────────────────── */
+    .activity-list { list-style: none; }
+    .activity-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .88rem;
+    }
+    .activity-list li:last-child { border-bottom: none; }
+    .a-info      { flex: 1; }
+    .a-runner    { font-weight: 700; }
+    .a-detail    { font-size: .77rem; color: var(--mid); }
+    .a-time      { font-family: monospace; font-weight: 700; font-size: .9rem; }
+
+    /* ── Bib badge ───────────────────────────────── */
+    .bib-badge {
+      background: var(--primary);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: .77rem;
+      font-weight: 700;
+      min-width: 38px;
+      text-align: center;
+    }
+    .bib-badge.fin { background: var(--success); }
+
+    /* ── Timing panel ────────────────────────────── */
+    .timing-panel {
+      background: var(--dark);
+      color: #fff;
+      border-radius: 8px;
+      padding: 20px 16px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .timing-panel .tip { font-size: .8rem; color: rgba(255,255,255,.55); margin-bottom: 14px; }
+    .bib-display {
+      font-family: monospace;
+      font-size: 3.2rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      min-height: 4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 260px;
+      margin: 0 auto;
+    }
+    .numpad button {
+      padding: 15px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      transition: background .12s;
+      touch-action: manipulation;
+    }
+    .numpad button:hover  { background: rgba(255,255,255,.22); }
+    .numpad button:active { background: var(--primary); }
+    .numpad .np-record    { background: var(--success); }
+    .numpad .np-record:hover  { background: #145a32; }
+    .numpad .np-clear         { background: rgba(192,57,43,.5); }
+    .numpad .np-clear:hover   { background: var(--danger); }
+
+    /* ── Table ───────────────────────────────────── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    th {
+      background: var(--light);
+      padding: 9px 7px;
+      text-align: left;
+      font-weight: 700;
+      color: var(--mid);
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 9px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #f8f9fa; }
+
+    /* ── Badges ──────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .b-reg      { background: #cfe2ff; color: #084298; }
+    .b-racing   { background: #fff3cd; color: #856404; }
+    .b-finished { background: #d1e7dd; color: #0a3622; }
+    .b-dnf      { background: #f8d7da; color: #842029; }
+
+    /* ── Results ─────────────────────────────────── */
+    .res-cat   { margin-bottom: 24px; }
+    .res-cat h3 {
+      background: var(--primary);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px 6px 0 0;
+      font-size: .88rem;
+    }
+    .res-cat table { border: 1px solid var(--border); border-top: none; }
+    .res-cat .ag-label {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--mid);
+      padding: 4px 8px;
+      background: var(--light);
+      border-radius: 4px;
+      margin: 8px 0 4px;
+    }
+    tr.r1 td { background: #fff9c4; }
+    tr.r2 td { background: #f5f5f5; }
+    tr.r3 td { background: #fff3e0; }
+
+    /* ── Confirm overlay ─────────────────────────── */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.52);
+      z-index: 198;
+    }
+    #overlay.show { display: block; }
+    #confirm-box {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 20px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.3);
+      z-index: 199;
+      text-align: center;
+      min-width: 260px;
+      max-width: 340px;
+      width: 90vw;
+    }
+    #confirm-box.show { display: block; }
+    .cf-finish { font-size: 1.5rem; font-weight: 800; color: var(--success); margin-bottom: 4px; }
+    .cf-bib    { font-size: 2.6rem; font-weight: 800; color: var(--primary); margin-bottom: 2px; }
+    .cf-name   { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .cf-lap    { font-size: .875rem; color: var(--mid); margin-bottom: 4px; }
+    .cf-time   { font-size: 1.2rem; font-family: monospace; font-weight: 800; color: var(--success); margin-bottom: 16px; }
+    .cf-btns   { display: flex; gap: 8px; justify-content: center; }
+
+    /* ── Toast ───────────────────────────────────── */
+    #toast-wrap {
+      position: fixed;
+      bottom: 20px;
+      right: 16px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .toast {
+      background: var(--dark);
+      color: #fff;
+      padding: 11px 15px;
+      border-radius: 7px;
+      font-size: .88rem;
+      box-shadow: var(--shadow);
+      animation: toastIn .25s ease;
+      max-width: 290px;
+    }
+    .toast.success { background: var(--success); }
+    .toast.error   { background: var(--danger); }
+    .toast.warning { background: var(--warning); }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+    /* ── DNF button row ──────────────────────────── */
+    .flex-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1 id="app-title">🏃 Tip Track Marathon</h1>
+  <div id="race-clock">00:00:00</div>
+</header>
+
+<nav>
+  <button id="nav-dashboard"    class="active" onclick="nav('dashboard')">🏠 Home</button>
+  <button id="nav-setup"                       onclick="nav('setup')">⚙️ Setup</button>
+  <button id="nav-participants"                onclick="nav('participants')">👥 Athletes</button>
+  <button id="nav-timing"                      onclick="nav('timing')">⏱️ Timing</button>
+  <button id="nav-results"                     onclick="nav('results')">🏆 Results</button>
+</nav>
+
+<main>
+
+  <!-- ═══════════════ DASHBOARD ═══════════════ -->
+  <div class="view active" id="view-dashboard">
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-val" id="s-total">0</div>
+        <div class="stat-lbl">Athletes</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val orange" id="s-racing">0</div>
+        <div class="stat-lbl">Racing</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val green"  id="s-finished">0</div>
+        <div class="stat-lbl">Finished</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="s-laps">0</div>
+        <div class="stat-lbl">Laps Recorded</div>
+      </div>
+    </div>
+
+    <div class="card" id="race-ctrl-card">
+      <h2>Race Control</h2>
+      <p id="race-status-msg" style="font-size:.88rem; color:var(--mid); margin-bottom:12px;">
+        Add athletes and configure the race in Setup, then start when ready.
+      </p>
+      <button class="btn btn-success btn-lg" id="btn-start" onclick="startRace()">
+        🚀 Start Race
+      </button>
+      <button class="btn btn-danger  btn-lg" id="btn-end"   onclick="endRace()" style="display:none;margin-top:8px;">
+        🏁 End Race
+      </button>
+    </div>
+
+    <div class="card">
+      <h2>Recent Activity</h2>
+      <ul class="activity-list" id="dash-activity">
+        <li style="color:var(--mid);font-style:italic;">No activity yet.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SETUP ═══════════════ -->
+  <div class="view" id="view-setup">
+    <div class="card">
+      <h2>Race Configuration</h2>
+      <div class="form-group">
+        <label>Race Name</label>
+        <input type="text" id="cfg-name" placeholder="e.g. Tip Track Marathon 2026">
+      </div>
+      <div class="form-group">
+        <label>Race Date</label>
+        <input type="date" id="cfg-date">
+      </div>
+      <div class="form-group">
+        <label>Venue / Location</label>
+        <input type="text" id="cfg-venue" placeholder="e.g. City Park">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveSetup()">💾 Save Configuration</button>
+    </div>
+
+    <div class="card">
+      <h2>Data Management</h2>
+      <div class="flex-row">
+        <button class="btn btn-outline" onclick="exportJSON()">📤 Export JSON</button>
+        <button class="btn btn-outline" onclick="exportCSV()">📊 Export CSV</button>
+        <button class="btn btn-danger  btn-sm" onclick="resetAll()">🗑️ Reset All Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ATHLETES ═══════════════ -->
+  <div class="view" id="view-participants">
+    <div class="card">
+      <h2>Register Athlete</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label>Bib Number *</label>
+          <input type="number" id="p-bib" placeholder="101" min="1">
+        </div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="p-name" placeholder="First Last">
+        </div>
+        <div class="form-group">
+          <label>Distance *</label>
+          <select id="p-dist">
+            <option value="21km">21 km — Half (3 laps)</option>
+            <option value="42km">42 km — Full (6 laps)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Gender *</label>
+          <select id="p-gender">
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:span 2;">
+          <label>Age Group *</label>
+          <select id="p-age">
+            <option value="18-30">18 – 30</option>
+            <option value="30-40">30 – 40</option>
+            <option value="40-50">40 – 50</option>
+            <option value="50-60">50 – 60</option>
+            <option value="60+">60 +</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="addAthlete()">➕ Add Athlete</button>
+    </div>
+
+    <div class="card">
+      <h2>Athletes <span id="ath-count" style="font-size:.82rem;color:var(--mid);font-weight:400;"></span></h2>
+      <div class="flex-row" style="margin-bottom:10px;">
+        <input type="text" id="ath-search" placeholder="Search bib or name…"
+               oninput="renderAthletes()" style="max-width:200px;">
+        <select id="ath-dist-filter" onchange="renderAthletes()" style="max-width:130px;">
+          <option value="">All Distances</option>
+          <option value="21km">21 km</option>
+          <option value="42km">42 km</option>
+        </select>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Bib</th><th>Name</th><th>Dist</th><th>Gen</th>
+              <th>Age</th><th>Laps</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="ath-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TIMING ═══════════════ -->
+  <div class="view" id="view-timing">
+
+    <div id="t-inactive" class="card" style="text-align:center;padding:36px 20px;">
+      <div style="font-size:3rem;margin-bottom:10px;">⏸️</div>
+      <div style="font-size:1.05rem;font-weight:700;margin-bottom:6px;">Race Not Started</div>
+      <div style="color:var(--mid);margin-bottom:14px;">Go to Home and start the race first.</div>
+      <button class="btn btn-primary" onclick="nav('dashboard')">Go to Home</button>
+    </div>
+
+    <div id="t-active" style="display:none;">
+      <div class="timing-panel">
+        <div class="tip">Type or tap a bib number, then press ✓ to record a lap or finish</div>
+        <div class="bib-display" id="bib-disp">_ _ _ _</div>
+        <div class="numpad">
+          <button onclick="kp('1')">1</button>
+          <button onclick="kp('2')">2</button>
+          <button onclick="kp('3')">3</button>
+          <button onclick="kp('4')">4</button>
+          <button onclick="kp('5')">5</button>
+          <button onclick="kp('6')">6</button>
+          <button onclick="kp('7')">7</button>
+          <button onclick="kp('8')">8</button>
+          <button onclick="kp('9')">9</button>
+          <button class="np-clear"  onclick="bibClear()">⌫</button>
+          <button onclick="kp('0')">0</button>
+          <button class="np-record" onclick="recordLap()">✓</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Recent Laps</h2>
+        <ul class="activity-list" id="t-recent">
+          <li style="color:var(--mid);font-style:italic;">No laps recorded yet.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ RESULTS ═══════════════ -->
+  <div class="view" id="view-results">
+    <div class="card" style="margin-bottom:12px;">
+      <div class="flex-row" style="justify-content:space-between;">
+        <h2 style="margin:0;border:none;padding:0;">Results</h2>
+        <div class="flex-row">
+          <select id="res-filter" onchange="renderResults()" style="width:auto;">
+            <option value="">All Categories</option>
+            <option value="21km-M">21 km Male</option>
+            <option value="21km-F">21 km Female</option>
+            <option value="42km-M">42 km Male</option>
+            <option value="42km-F">42 km Female</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="renderResults()">↻</button>
+        </div>
+      </div>
+    </div>
+    <div id="res-content"></div>
+  </div>
+
+</main>
+
+<!-- Confirm overlay -->
+<div id="overlay" onclick="cancelConfirm()"></div>
+<div id="confirm-box">
+  <div id="cf-finish-lbl" class="cf-finish" style="display:none;">🏁 FINISH!</div>
+  <div class="cf-bib"  id="cf-bib"></div>
+  <div class="cf-name" id="cf-name"></div>
+  <div class="cf-lap"  id="cf-lap"></div>
+  <div class="cf-time" id="cf-time"></div>
+  <div class="cf-btns">
+    <button class="btn btn-success" onclick="doConfirm()">✓ Confirm</button>
+    <button class="btn btn-outline" onclick="cancelConfirm()">✕ Cancel</button>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-wrap"></div>
+
+<script>
+/* ============================================================
+   DATA MODEL & CONSTANTS
+   ============================================================ */
+const LAPS = { '21km': 3, '42km': 6 };
+const AGE_GROUPS = ['18-30','30-40','40-50','50-60','60+'];
+
+let db = {
+  race: {
+    name:      'Tip Track Marathon',
+    date:      '',
+    venue:     '',
+    status:    'setup',   // 'setup' | 'active' | 'finished'
+    startTime: null
+  },
+  athletes:  [],  // see addAthlete() for shape
+  activity:  []   // recent log, max 60 entries
+};
+
+let bibBuf   = '';          // current numpad input
+let pending  = null;        // pending confirm record
+let clockTmr = null;
+
+/* ============================================================
+   PERSISTENCE
+   ============================================================ */
+function save()  { localStorage.setItem('ttrack-v1', JSON.stringify(db)); }
+function load() {
+  try {
+    const raw = localStorage.getItem('ttrack-v1');
+    if (raw) db = JSON.parse(raw);
+  } catch(e) { /* ignore corrupt data */ }
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function nav(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.getElementById('nav-'  + view).classList.add('active');
+  if (view === 'dashboard')    renderDashboard();
+  if (view === 'participants') renderAthletes();
+  if (view === 'timing')       renderTimingView();
+  if (view === 'results')      renderResults();
+}
+
+/* ============================================================
+   SETUP
+   ============================================================ */
+function loadSetupForm() {
+  document.getElementById('cfg-name').value  = db.race.name  || '';
+  document.getElementById('cfg-date').value  = db.race.date  || '';
+  document.getElementById('cfg-venue').value = db.race.venue || '';
+}
+
+function saveSetup() {
+  db.race.name  = document.getElementById('cfg-name').value.trim()  || 'Race';
+  db.race.date  = document.getElementById('cfg-date').value;
+  db.race.venue = document.getElementById('cfg-venue').value.trim();
+  document.getElementById('app-title').textContent = '🏃 ' + db.race.name;
+  save();
+  toast('Configuration saved!', 'success');
+}
+
+/* ============================================================
+   ATHLETES
+   ============================================================ */
+function addAthlete() {
+  const bib    = String(document.getElementById('p-bib').value).trim();
+  const name   = document.getElementById('p-name').value.trim();
+  const dist   = document.getElementById('p-dist').value;
+  const gender = document.getElementById('p-gender').value;
+  const age    = document.getElementById('p-age').value;
+
+  if (!bib || !name) { toast('Bib number and name are required.', 'error'); return; }
+  if (db.athletes.find(a => a.bib === bib)) { toast('Bib #' + bib + ' already registered!', 'error'); return; }
+
+  db.athletes.push({ bib, name, dist, gender, age,
+    laps: [],             // [{ts, elapsed}]
+    finishElapsed: null,
+    status: 'registered'
+  });
+
+  save();
+  document.getElementById('p-bib').value  = '';
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-bib').focus();
+  renderAthletes();
+  renderDashboard();
+  toast('Added: ' + name + ' (Bib #' + bib + ')', 'success');
+}
+
+function removeAthlete(bib) {
+  if (!confirm('Remove athlete Bib #' + bib + '?')) return;
+  db.athletes = db.athletes.filter(a => a.bib !== bib);
+  save();
+  renderAthletes();
+  renderDashboard();
+}
+
+function markDNF(bib) {
+  const a = db.athletes.find(x => x.bib === bib);
+  if (!a) return;
+  if (!confirm('Mark Bib #' + bib + ' (' + a.name + ') as DNF?')) return;
+  a.status = 'dnf';
+  save();
+  renderAthletes();
+  renderDashboard();
+  toast(a.name + ' marked DNF.', 'warning');
+}
+
+function renderAthletes() {
+  const search      = (document.getElementById('ath-search').value || '').toLowerCase();
+  const distFilter  = document.getElementById('ath-dist-filter').value;
+
+  let list = db.athletes.filter(a => {
+    const matchS = !search || a.bib.includes(search) || a.name.toLowerCase().includes(search);
+    const matchD = !distFilter || a.dist === distFilter;
+    return matchS && matchD;
+  }).sort((a, b) => Number(a.bib) - Number(b.bib));
+
+  document.getElementById('ath-count').textContent = '(' + db.athletes.length + ' total)';
+
+  const tbody = document.getElementById('ath-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--mid);padding:20px;">No athletes found.</td></tr>';
+    return;
+  }
+
+  const statusBadge = s => ({
+    registered: '<span class="badge b-reg">Registered</span>',
+    racing:     '<span class="badge b-racing">Racing</span>',
+    finished:   '<span class="badge b-finished">Finished</span>',
+    dnf:        '<span class="badge b-dnf">DNF</span>'
+  }[s] || '');
+
+  tbody.innerHTML = list.map(a => {
+    const total = LAPS[a.dist];
+    const done  = a.laps.length;
+    const canDel = (a.status === 'registered');
+    const canDNF = (a.status === 'racing');
+    return `<tr>
+      <td><strong>${esc(a.bib)}</strong></td>
+      <td>${esc(a.name)}</td>
+      <td>${a.dist}</td>
+      <td>${a.gender}</td>
+      <td>${a.age}</td>
+      <td>${done}/${total}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td style="white-space:nowrap;">
+        ${canDel ? `<button class="btn btn-danger btn-sm" onclick="removeAthlete('${esc(a.bib)}')">✕</button>` : ''}
+        ${canDNF ? `<button class="btn btn-warning btn-sm" onclick="markDNF('${esc(a.bib)}')">DNF</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ============================================================
+   RACE CONTROL
+   ============================================================ */
+function startRace() {
+  if (!db.athletes.length) { toast('Add at least one athlete first.', 'error'); return; }
+  if (!confirm('Start the race now?')) return;
+  db.race.status    = 'active';
+  db.race.startTime = Date.now();
+  db.athletes.forEach(a => { if (a.status === 'registered') a.status = 'racing'; });
+  save();
+  updateRaceCtrl();
+  startClock();
+  renderDashboard();
+  toast('🚀 Race started!', 'success');
+  nav('timing');
+}
+
+function endRace() {
+  if (!confirm('End the race? Timing will stop.')) return;
+  db.race.status = 'finished';
+  save();
+  stopClock();
+  updateRaceCtrl();
+  toast('🏁 Race ended.', 'success');
+}
+
+function updateRaceCtrl() {
+  const s = db.race.status;
+  document.getElementById('btn-start').style.display = (s === 'active') ? 'none' : '';
+  document.getElementById('btn-end').style.display   = (s === 'active') ? '' : 'none';
+  document.getElementById('race-status-msg').textContent = {
+    setup:    'Add athletes and configure the race in Setup, then start when ready.',
+    active:   '🟢 Race is in progress.',
+    finished: '🏁 Race has ended.'
+  }[s] || '';
+}
+
+/* ============================================================
+   CLOCK
+   ============================================================ */
+function startClock() {
+  if (clockTmr) clearInterval(clockTmr);
+  const el = document.getElementById('race-clock');
+  el.style.display = '';
+  clockTmr = setInterval(() => {
+    if (db.race.startTime) el.textContent = fmtMs(Date.now() - db.race.startTime);
+  }, 500);
+}
+
+function stopClock() { if (clockTmr) clearInterval(clockTmr); }
+
+function fmtMs(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return [h, m, s % 60].map(x => String(x).padStart(2,'0')).join(':');
+}
+
+/* ============================================================
+   TIMING — NUMPAD
+   ============================================================ */
+function kp(d) {
+  if (bibBuf.length >= 5) return;
+  bibBuf += d;
+  updBibDisplay();
+}
+
+function bibClear() {
+  bibBuf = '';
+  updBibDisplay();
+}
+
+function updBibDisplay() {
+  const el = document.getElementById('bib-disp');
+  if (!el) return;
+  el.textContent = bibBuf ? bibBuf : '_ _ _ _';
+}
+
+function recordLap() {
+  if (!bibBuf) { toast('Enter a bib number first.', 'warning'); return; }
+
+  const ath = db.athletes.find(a => a.bib === bibBuf);
+  if (!ath) { toast('Bib #' + bibBuf + ' not found!', 'error'); bibClear(); return; }
+  if (ath.status === 'finished') { toast(ath.name + ' has already finished!', 'warning'); bibClear(); return; }
+  if (ath.status === 'dnf')      { toast(ath.name + ' is marked DNF.', 'warning'); bibClear(); return; }
+  if (ath.status === 'registered') { toast(ath.name + ' has not started (race not active?).', 'warning'); bibClear(); return; }
+
+  const elapsed     = Date.now() - db.race.startTime;
+  const total       = LAPS[ath.dist];
+  const done        = ath.laps.length;
+  const lapNum      = done + 1;
+  const isFinish    = lapNum >= total;
+
+  pending = { ath, elapsed, lapNum, isFinish };
+
+  document.getElementById('cf-finish-lbl').style.display = isFinish ? '' : 'none';
+  document.getElementById('cf-bib').textContent  = '#' + ath.bib;
+  document.getElementById('cf-name').textContent = ath.name;
+  document.getElementById('cf-lap').textContent  = isFinish
+    ? `Completing lap ${lapNum} of ${total} — FINISH! (${ath.dist})`
+    : `Lap ${lapNum} of ${total}  (${ath.dist})`;
+  document.getElementById('cf-time').textContent = fmtMs(elapsed);
+
+  document.getElementById('confirm-box').classList.add('show');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function doConfirm() {
+  if (!pending) return;
+  const { ath, elapsed, lapNum, isFinish } = pending;
+
+  ath.laps.push({ ts: Date.now(), elapsed });
+  if (isFinish) {
+    ath.finishElapsed = elapsed;
+    ath.status = 'finished';
+  }
+
+  db.activity.unshift({ bib: ath.bib, name: ath.name, lapNum, isFinish, elapsed });
+  if (db.activity.length > 60) db.activity.length = 60;
+
+  save();
+  cancelConfirm();
+  renderRecentLaps();
+  renderDashboard();
+  toast(isFinish
+    ? '🏁 ' + ath.name + ' FINISHED in ' + fmtMs(elapsed)
+    : '✓ Lap ' + lapNum + ' — ' + ath.name,
+    isFinish ? 'success' : '');
+}
+
+function cancelConfirm() {
+  pending = null;
+  bibClear();
+  document.getElementById('confirm-box').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function renderTimingView() {
+  const active = db.race.status === 'active';
+  document.getElementById('t-inactive').style.display = active ? 'none' : '';
+  document.getElementById('t-active').style.display   = active ? '' : 'none';
+  if (active) renderRecentLaps();
+}
+
+function renderRecentLaps() {
+  const ul = document.getElementById('t-recent');
+  if (!ul) return;
+  if (!db.activity.length) {
+    ul.innerHTML = '<li style="color:var(--mid);font-style:italic;">No laps recorded yet.</li>';
+    return;
+  }
+  ul.innerHTML = db.activity.slice(0, 15).map(a => `
+    <li>
+      <span class="bib-badge ${a.isFinish ? 'fin' : ''}">${esc(a.bib)}</span>
+      <div class="a-info">
+        <div class="a-runner">${esc(a.name)}</div>
+        <div class="a-detail">${a.isFinish ? '🏁 Finished' : 'Lap ' + a.lapNum}</div>
+      </div>
+      <span class="a-time">${fmtMs(a.elapsed)}</span>
+    </li>`).join('');
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function renderDashboard() {
+  const ps = db.athletes;
+  document.getElementById('s-total').textContent    = ps.length;
+  document.getElementById('s-racing').textContent   = ps.filter(a => a.status === 'racing').length;
+  document.getElementById('s-finished').textContent = ps.filter(a => a.status === 'finished').length;
+  document.getElementById('s-laps').textContent     = ps.reduce((n, a) => n + a.laps.length, 0);
+  updateRaceCtrl();
+
+  const ul = document.getElementById('dash-activity');
+  if (!db.activity.length) {
+    ul.innerHTML = '<li style="color:var(--mid);font-style:italic;">No activity yet.</li>';
+    return;
+  }
+  ul.innerHTML = db.activity.slice(0, 8).map(a => `
+    <li>
+      <span class="bib-badge ${a.isFinish ? 'fin' : ''}">${esc(a.bib)}</span>
+      <div class="a-info">
+        <div class="a-runner">${esc(a.name)}</div>
+        <div class="a-detail">${a.isFinish ? '🏁 Finished' : 'Lap ' + a.lapNum}</div>
+      </div>
+      <span class="a-time">${fmtMs(a.elapsed)}</span>
+    </li>`).join('');
+}
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+const CATS = [
+  { key:'21km-M', label:'21 km — Male',   dist:'21km', gender:'M' },
+  { key:'21km-F', label:'21 km — Female', dist:'21km', gender:'F' },
+  { key:'42km-M', label:'42 km — Male',   dist:'42km', gender:'M' },
+  { key:'42km-F', label:'42 km — Female', dist:'42km', gender:'F' }
+];
+
+function renderResults() {
+  const fv   = document.getElementById('res-filter').value;
+  const cats = fv ? CATS.filter(c => c.key === fv) : CATS;
+  let html   = '';
+
+  cats.forEach(cat => {
+    const pool = db.athletes.filter(a => a.dist === cat.dist && a.gender === cat.gender);
+    if (!pool.length) return;
+
+    const finished   = pool.filter(a => a.status === 'finished' && a.finishElapsed != null)
+                           .sort((a, b) => a.finishElapsed - b.finishElapsed);
+    const stillRacing = pool.filter(a => a.status === 'racing');
+    const notStarted  = pool.filter(a => a.status === 'registered' || a.status === 'dnf');
+
+    html += `<div class="res-cat"><h3>${cat.label}</h3><table>
+      <thead><tr><th>Rank</th><th>Bib</th><th>Name</th><th>Age</th>
+        <th>Laps</th><th>Finish Time</th><th>Status</th></tr></thead><tbody>`;
+
+    if (!pool.length) {
+      html += `<tr><td colspan="7" style="text-align:center;color:var(--mid);padding:16px;">No athletes.</td></tr>`;
+    }
+
+    // Finished athletes
+    finished.forEach((a, i) => {
+      const rank  = i + 1;
+      const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank;
+      const cls   = rank<=3 ? ' class="r'+rank+'"' : '';
+      html += `<tr${cls}>
+        <td><strong>${medal}</strong></td>
+        <td>${esc(a.bib)}</td><td>${esc(a.name)}</td><td>${a.age}</td>
+        <td>${a.laps.length}/${LAPS[a.dist]}</td>
+        <td><strong>${fmtMs(a.finishElapsed)}</strong></td>
+        <td><span class="badge b-finished">Finished</span></td></tr>`;
+    });
+
+    // Still racing
+    stillRacing.forEach(a => {
+      const last = a.laps.length ? fmtMs(a.laps[a.laps.length-1].elapsed) + ' (last lap)' : '—';
+      html += `<tr>
+        <td>—</td><td>${esc(a.bib)}</td><td>${esc(a.name)}</td><td>${a.age}</td>
+        <td>${a.laps.length}/${LAPS[a.dist]}</td>
+        <td>${last}</td>
+        <td><span class="badge b-racing">Racing</span></td></tr>`;
+    });
+
+    // Not started / DNF
+    notStarted.forEach(a => {
+      const badgeCls = a.status === 'dnf' ? 'b-dnf' : 'b-reg';
+      const badgeTxt = a.status === 'dnf' ? 'DNF'   : 'Registered';
+      html += `<tr>
+        <td>—</td><td>${esc(a.bib)}</td><td>${esc(a.name)}</td><td>${a.age}</td>
+        <td>0/${LAPS[a.dist]}</td><td>—</td>
+        <td><span class="badge ${badgeCls}">${badgeTxt}</span></td></tr>`;
+    });
+
+    html += `</tbody></table>`;
+
+    // Age-group sub-rankings
+    if (finished.length > 0) {
+      html += `<div style="margin-top:10px;font-size:.78rem;font-weight:700;color:var(--mid);">Age Group Rankings</div>`;
+      AGE_GROUPS.forEach(ag => {
+        const sub = finished.filter(a => a.age === ag);
+        if (!sub.length) return;
+        html += `<div class="ag-label">${ag}</div>
+          <table><thead><tr><th>Rank</th><th>Bib</th><th>Name</th><th>Finish Time</th></tr></thead><tbody>`;
+        sub.forEach((a, i) => {
+          const r = i+1, m = r===1?'🥇':r===2?'🥈':r===3?'🥉':r;
+          html += `<tr class="${r<=3?'r'+r:''}">
+            <td>${m}</td><td>${esc(a.bib)}</td><td>${esc(a.name)}</td>
+            <td><strong>${fmtMs(a.finishElapsed)}</strong></td></tr>`;
+        });
+        html += `</tbody></table>`;
+      });
+    }
+
+    html += `</div>`;
+  });
+
+  document.getElementById('res-content').innerHTML = html
+    || '<div class="card" style="text-align:center;color:var(--mid);padding:32px;">No results yet.</div>';
+}
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
+function exportJSON() {
+  const maxLaps = 6;
+  const payload = {
+    race: db.race,
+    exportedAt: new Date().toISOString(),
+    athletes: db.athletes.map(a => ({
+      bib:          a.bib,
+      name:         a.name,
+      distance:     a.dist,
+      gender:       a.gender,
+      ageGroup:     a.age,
+      status:       a.status,
+      totalLaps:    LAPS[a.dist],
+      lapsCompleted: a.laps.length,
+      lapTimes:     a.laps.map((l, i) => ({
+        lap:            i + 1,
+        elapsedMs:      l.elapsed,
+        elapsedFormatted: fmtMs(l.elapsed),
+        splitMs:        i === 0 ? l.elapsed : l.elapsed - a.laps[i-1].elapsed,
+        splitFormatted: fmtMs(i === 0 ? l.elapsed : l.elapsed - a.laps[i-1].elapsed)
+      })),
+      finishTimeMs:        a.finishElapsed,
+      finishTimeFormatted: a.finishElapsed ? fmtMs(a.finishElapsed) : null
+    }))
+  };
+  dl(JSON.stringify(payload, null, 2), 'race-data.json', 'application/json');
+}
+
+function exportCSV() {
+  const maxLaps = 6; // 42km has 6 laps — the max
+  const lapHeaders = [];
+  for (let i = 1; i <= maxLaps; i++) {
+    lapHeaders.push('Lap ' + i + ' Elapsed', 'Lap ' + i + ' Split');
+  }
+  const rows = [['Bib','Name','Distance','Gender','Age Group','Status','Laps Completed','Total Laps','Finish Time', ...lapHeaders]];
+
+  db.athletes.forEach(a => {
+    const lapCells = [];
+    for (let i = 0; i < maxLaps; i++) {
+      const lap = a.laps[i];
+      if (lap) {
+        const split = i === 0 ? lap.elapsed : lap.elapsed - a.laps[i-1].elapsed;
+        lapCells.push(fmtMs(lap.elapsed), fmtMs(split));
+      } else {
+        lapCells.push('', '');
+      }
+    }
+    rows.push([
+      a.bib, a.name, a.dist, a.gender, a.age, a.status,
+      a.laps.length, LAPS[a.dist],
+      a.finishElapsed ? fmtMs(a.finishElapsed) : '',
+      ...lapCells
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  dl(csv, 'race-results.csv', 'text/csv');
+}
+
+function dl(content, filename, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetAll() {
+  if (!confirm('Delete ALL race data? This cannot be undone!')) return;
+  if (!confirm('Second confirmation — are you absolutely sure?')) return;
+  localStorage.removeItem('ttrack-v1');
+  location.reload();
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  document.getElementById('toast-wrap').appendChild(t);
+  setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0';
+    setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+/* ============================================================
+   SECURITY HELPER — prevent XSS from stored data
+   ============================================================ */
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ============================================================
+   KEYBOARD SUPPORT (timing screen)
+   ============================================================ */
+document.addEventListener('keydown', e => {
+  if (db.race.status !== 'active') return;
+  const active = document.querySelector('.view.active');
+  if (!active || active.id !== 'view-timing') return;
+  if (e.key >= '0' && e.key <= '9') { kp(e.key); e.preventDefault(); }
+  else if (e.key === 'Enter')        { recordLap(); e.preventDefault(); }
+  else if (['Backspace','Escape','Delete'].includes(e.key)) { bibClear(); e.preventDefault(); }
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+(function init() {
+  load();
+  loadSetupForm();
+  document.getElementById('app-title').textContent = '🏃 ' + db.race.name;
+  document.getElementById('cfg-date').value = db.race.date || new Date().toISOString().split('T')[0];
+  updateRaceCtrl();
+  renderDashboard();
+  if (db.race.status === 'active' && db.race.startTime) startClock();
+  else if (db.race.status === 'finished' && db.race.startTime) {
+    document.getElementById('race-clock').style.display = '';
+    document.getElementById('race-clock').textContent   = fmtMs(Date.now() - db.race.startTime);
+  }
+})();
+</script>
+</body>
+</html>
